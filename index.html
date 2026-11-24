@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Games — Arcade</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=Oswald:wght@400;600;700&display=swap"
+      rel="stylesheet"
+      onerror="this.remove()"
+    />
+    <style>
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; min-height: 100%; }
+      body {
+        background: radial-gradient(circle at 50% 0%, #16202b 0%, #07090c 60%) fixed;
+        color: #e8e8e8;
+        font-family: 'Oswald', Impact, sans-serif;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 48px 20px 64px;
+      }
+      header { text-align: center; margin-bottom: 40px; }
+      h1 {
+        font-family: 'Bowlby One', Impact, 'Arial Black', sans-serif;
+        font-size: clamp(30px, 6vw, 54px);
+        letter-spacing: 3px;
+        margin: 0;
+        color: #f2c230;
+        text-shadow: 4px 4px 0 #000;
+      }
+      header p {
+        margin: 14px 0 0;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        font-size: 13px;
+        color: #8fa0b0;
+      }
+      .grid {
+        width: 100%;
+        max-width: 980px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 22px;
+      }
+      a.card {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        min-height: 240px;
+        padding: 24px;
+        border: 2px solid #232a33;
+        border-radius: 10px;
+        text-decoration: none;
+        color: inherit;
+        overflow: hidden;
+        background: #10161d;
+        transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+      }
+      a.card:hover, a.card:focus-visible {
+        transform: translateY(-4px);
+        border-color: #f2c230;
+        box-shadow: 0 14px 30px rgba(0, 0, 0, .55);
+        outline: none;
+      }
+      a.card .glow {
+        position: absolute;
+        inset: -40% -20% auto;
+        height: 260px;
+        background: radial-gradient(circle, var(--accent) 0%, transparent 68%);
+        opacity: .35;
+        filter: blur(6px);
+        transition: opacity .18s ease;
+        pointer-events: none;
+      }
+      a.card:hover .glow { opacity: .6; }
+      a.card .tag {
+        position: relative;
+        align-self: flex-start;
+        font-size: 11px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        padding: 3px 9px;
+        border: 1px solid currentColor;
+        border-radius: 999px;
+        color: var(--accent);
+        margin-bottom: auto;
+      }
+      a.card h2 {
+        position: relative;
+        font-family: 'Bowlby One', Impact, 'Arial Black', sans-serif;
+        font-size: 24px;
+        letter-spacing: 1px;
+        margin: 26px 0 8px;
+        text-shadow: 2px 2px 0 #000;
+      }
+      a.card p {
+        position: relative;
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.45;
+        color: #9fb0c0;
+      }
+      a.card .play {
+        position: relative;
+        margin-top: 18px;
+        font-size: 13px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: var(--accent);
+        font-weight: 600;
+      }
+      footer {
+        margin-top: 44px;
+        font-size: 12px;
+        letter-spacing: 1px;
+        color: #55636f;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>ARCADE</h1>
+      <p>Escolha um jogo</p>
+    </header>
+
+    <main class="grid">
+      <a class="card" href="santa-muerta-stories/index.html" style="--accent: #f2c230;">
+        <span class="glow"></span>
+        <span class="tag">Open world</span>
+        <h2>Santa Muerta Stories</h2>
+        <p>Sandbox de crime em mundo aberto: carros, tiros, missões e uma cidade 3D para explorar.</p>
+        <span class="play">Jogar &rarr;</span>
+      </a>
+
+      <a class="card" href="rick-sanchez-3d/index.html" style="--accent: #00e5ff;">
+        <span class="glow"></span>
+        <span class="tag">Visualizador 3D</span>
+        <h2>Rick Sanchez 3D</h2>
+        <p>Visualizador de modelos 3D com órbita, zoom e carregamento de arquivos .glb / .gltf.</p>
+        <span class="play">Abrir &rarr;</span>
+      </a>
+    </main>
+
+    <footer>Use um navegador moderno com WebGL habilitado.</footer>
+  </body>
+</html>
