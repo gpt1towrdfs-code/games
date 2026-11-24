@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rick Sanchez — Visualizador 3D</title>
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --border: #1f2d45;
+    --accent: #00e5ff;
+    --accent2: #39ff14;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --panel-bg: rgba(10, 14, 26, 0.85);
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0a0e1a;
+      --surface: #111827;
+    }
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Courier New', monospace;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  html, body { height: 100%; }
+
+  #canvas-container {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+  }
+
+  canvas {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  /* HUD top */
+  #hud-top {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 16px);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    text-align: center;
+    pointer-events: none;
+  }
+
+  #hud-top h1 {
+    font-size: clamp(1.1rem, 3vw, 1.6rem);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    text-shadow: 0 0 20px var(--accent), 0 0 40px rgba(0,229,255,0.3);
+  }
+
+  #hud-top p {
+    font-size: 0.7rem;
+    color: var(--muted);
+    margin-top: 4px;
+    letter-spacing: 0.15em;
+  }
+
+  /* Drop zone */
+  #drop-zone {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    gap: 24px;
+  }
+
+  #drop-zone.hidden { display: none; }
+
+  .portal {
+    width: 160px;
+    height: 160px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #39ff14 0%, #00e5ff 40%, #0a0e1a 70%);
+    animation: pulse 2s ease-in-out infinite;
+    box-shadow: 0 0 60px #39ff14, 0 0 120px rgba(0,229,255,0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3rem;
+    cursor: pointer;
+  }
+
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); box-shadow: 0 0 60px #39ff14, 0 0 120px rgba(0,229,255,0.4); }
+    50% { transform: scale(1.06); box-shadow: 0 0 90px #39ff14, 0 0 180px rgba(0,229,255,0.5); }
+  }
+
+  #drop-zone h2 {
+    font-size: 1.3rem;
+    color: var(--accent);
+    text-align: center;
+    text-shadow: 0 0 12px var(--accent);
+  }
+
+  #drop-zone p {
+    color: var(--muted);
+    font-size: 0.8rem;
+    text-align: center;
+    max-width: 280px;
+    line-height: 1.6;
+  }
+
+  .file-btn {
+    background: transparent;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    padding: 10px 28px;
+    font-family: inherit;
+    font-size: 0.85rem;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: background 0.2s, box-shadow 0.2s;
+  }
+
+  .file-btn:hover {
+    background: rgba(0,229,255,0.1);
+    box-shadow: 0 0 16px rgba(0,229,255,0.3);
+  }
+
+  #file-input { display: none; }
+
+  /* Controls panel */
+  #controls {
+    position: fixed;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    display: flex;
+    gap: 8px;
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    padding: 10px 14px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  #controls.hidden { display: none; }
+
+  .ctrl-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 12px;
+    font-family: inherit;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s;
+    white-space: nowrap;
+  }
+
+  .ctrl-btn:hover, .ctrl-btn.active {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* Animation panel */
+  #anim-panel {
+    position: fixed;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 10;
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    padding: 12px;
+    backdrop-filter: blur(12px);
+    max-height: 60vh;
+    overflow-y: auto;
+    min-width: 140px;
+    display: none;
+  }
+
+  #anim-panel.visible { display: block; }
+
+  #anim-panel h3 {
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    margin-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 6px;
+  }
+
+  .anim-btn {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.72rem;
+    padding: 5px 4px;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    transition: color 0.15s;
+    border-bottom: 1px solid rgba(31,45,69,0.4);
+  }
+
+  .anim-btn:hover, .anim-btn.playing {
+    color: var(--accent2);
+  }
+
+  .anim-btn.playing::before { content: '▶ '; }
+
+  /* Info bar */
+  #info-bar {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 16px);
+    left: 16px;
+    z-index: 10;
+    font-size: 0.65rem;
+    color: var(--muted);
+    line-height: 1.8;
+    pointer-events: none;
+    display: none;
+  }
+
+  #info-bar.visible { display: block; }
+
+  #info-bar span { display: block; }
+  #info-bar strong { color: var(--accent); }
+
+  /* Loading overlay */
+  #loading {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    display: none;
+  }
+
+  #loading.visible { display: flex; }
+
+  .loader-ring {
+    width: 60px;
+    height: 60px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #loading p {
+    color: var(--muted);
+    font-size: 0.8rem;
+    letter-spacing: 0.1em;
+  }
+
+  /* drag highlight */
+  body.drag-over #drop-zone {
+    background: rgba(0,229,255,0.05);
+  }
+
+
+  /* Speed / slow-down panel */
+  #speed-panel {
+    position: fixed;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 72px);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 94vw;
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    padding: 10px 14px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  #speed-panel.hidden { display: none; }
+
+  .speed-label {
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    white-space: nowrap;
+  }
+
+  #speed-value {
+    font-size: 0.78rem;
+    color: var(--accent2);
+    min-width: 52px;
+    text-align: center;
+    text-shadow: 0 0 10px rgba(57,255,20,0.5);
+  }
+
+  #speed-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 150px;
+    height: 4px;
+    background: var(--border);
+    outline: none;
+    cursor: pointer;
+  }
+
+  #speed-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid var(--bg);
+    box-shadow: 0 0 10px var(--accent);
+    cursor: pointer;
+  }
+
+  #speed-slider::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid var(--bg);
+    box-shadow: 0 0 10px var(--accent);
+    cursor: pointer;
+  }
+
+  .speed-presets { display: flex; gap: 6px; }
+
+  #btn-slowmo.active {
+    border-color: var(--accent2);
+    color: var(--accent2);
+    box-shadow: 0 0 12px rgba(57,255,20,0.35);
+  }
+
+  @media (max-width: 600px) {
+    #speed-panel { bottom: calc(env(safe-area-inset-bottom, 0px) + 64px); gap: 8px; padding: 8px 10px; }
+    #speed-slider { width: 110px; }
+  }
+
+  /* scrollbar */
+  #anim-panel::-webkit-scrollbar { width: 4px; }
+  #anim-panel::-webkit-scrollbar-track { background: transparent; }
+  #anim-panel::-webkit-scrollbar-thumb { background: var(--border); }
+</style>
+</head>
+<body>
+
+<!-- Drop Zone -->
+<div id="drop-zone">
+  <div class="portal">🧪</div>
+  <h2>Rick Sanchez — Viewer</h2>
+  <p>Arraste o arquivo <strong style="color:var(--accent)">Rick_Sanchez.glb</strong> aqui, ou clique para selecionar.</p>
+  <button class="file-btn" onclick="document.getElementById('file-input').click()">SELECIONAR ARQUIVO .GLB</button>
+  <input type="file" id="file-input" accept=".glb,.gltf">
+  <p style="font-size:0.65rem; margin-top:8px;">Suporta: GLB · GLTF · com animações</p>
+</div>
+
+<!-- Loading -->
+<div id="loading">
+  <div class="loader-ring"></div>
+  <p>CARREGANDO MODELO...</p>
+</div>
+
+<!-- Canvas -->
+<div id="canvas-container"></div>
+
+<!-- HUD top -->
+<div id="hud-top">
+  <h1>RICK SANCHEZ</h1>
+  <p>PROTOTYPE VIEWER · C-137</p>
+</div>
+
+<!-- Info bar -->
+<div id="info-bar">
+  <span><strong>VÉRTICES</strong> <span id="info-verts">—</span></span>
+  <span><strong>MALHAS</strong> <span id="info-meshes">—</span></span>
+  <span><strong>ANIMAÇÕES</strong> <span id="info-anims">—</span></span>
+  <span><strong>VELOCIDADE</strong> <span id="info-speed">1.00×</span></span>
+</div>
+
+<!-- Animation panel -->
+<div id="anim-panel">
+  <h3>ANIMAÇÕES</h3>
+  <div id="anim-list"></div>
+</div>
+
+<!-- Controls -->
+<div id="controls" class="hidden">
+  <button class="ctrl-btn" id="btn-reset">RESETAR</button>
+  <button class="ctrl-btn" id="btn-wireframe">WIREFRAME</button>
+  <button class="ctrl-btn" id="btn-autorot">AUTO-ROTAR</button>
+  <button class="ctrl-btn" id="btn-bg">BG</button>
+  <button class="ctrl-btn" id="btn-new">NOVO ARQUIVO</button>
+</div>
+
+<!-- Speed / slow-down -->
+<div id="speed-panel" class="hidden">
+  <span class="speed-label">VELOCIDADE</span>
+  <input type="range" id="speed-slider" min="0.1" max="2" step="0.05" value="1" aria-label="Velocidade da animação">
+  <span id="speed-value">1.00×</span>
+  <div class="speed-presets">
+    <button class="ctrl-btn speed-preset" data-speed="0.25">0.25×</button>
+    <button class="ctrl-btn speed-preset" data-speed="0.5">0.5×</button>
+    <button class="ctrl-btn speed-preset active" data-speed="1">1×</button>
+    <button class="ctrl-btn speed-preset" data-speed="2">2×</button>
+  </div>
+  <button class="ctrl-btn" id="btn-slowmo" title="Alternar câmera lenta (tecla S)">🐌 DESACELERAR</button>
+</div>
+
+<!-- Three.js r128 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<!-- GLTFLoader -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<!-- OrbitControls -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────
+let scene, camera, renderer, controls, mixer, clock;
+let model = null;
+let animations = [];
+let currentAction = null;
+let wireframeOn = false;
+let autoRotate = false;
+let bgDark = true;
+let animFrame;
+let playbackSpeed = 1;   // multiplicador de velocidade (1 = normal)
+let slowMoOn = false;    // modo câmera lenta ativo?
+let prevSpeed = 1;       // velocidade guardada antes do slow-mo
+const SLOWMO_SPEED = 0.25;
+
+// ── Init Three.js ──────────────────────────────────────────────────
+function initThree() {
+  const container = document.getElementById('canvas-container');
+
+  // Scene
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0a0e1a);
+  scene.fog = new THREE.FogExp2(0x0a0e1a, 0.03);
+
+  // Camera
+  camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 100);
+  camera.position.set(0, 1.4, 3.5);
+
+  // Renderer
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  container.appendChild(renderer.domElement);
+
+  // Controls
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.minDistance = 0.5;
+  controls.maxDistance = 20;
+  controls.target.set(0, 0.9, 0);
+  controls.update();
+
+  // Lights
+  const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+  scene.add(ambient);
+
+  const key = new THREE.DirectionalLight(0x00e5ff, 1.2);
+  key.position.set(2, 4, 3);
+  key.castShadow = true;
+  key.shadow.mapSize.set(1024, 1024);
+  scene.add(key);
+
+  const fill = new THREE.DirectionalLight(0x39ff14, 0.4);
+  fill.position.set(-3, 2, -2);
+  scene.add(fill);
+
+  const rim = new THREE.DirectionalLight(0xffffff, 0.3);
+  rim.position.set(0, -1, -4);
+  scene.add(rim);
+
+  // Grid
+  const grid = new THREE.GridHelper(10, 20, 0x1f2d45, 0x111827);
+  grid.position.y = 0;
+  scene.add(grid);
+
+  // Clock
+  clock = new THREE.Clock();
+
+  // Resize
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  loop();
+}
+
+function loop() {
+  animFrame = requestAnimationFrame(loop);
+  const delta = clock.getDelta();
+  if (mixer) mixer.update(delta * playbackSpeed);
+  if (autoRotate && model) model.rotation.y += 0.005 * playbackSpeed;
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+// ── Load GLB ──────────────────────────────────────────────────────
+function loadGLB(url, name) {
+  document.getElementById('drop-zone').classList.add('hidden');
+  document.getElementById('loading').classList.add('visible');
+
+  if (model) {
+    scene.remove(model);
+    model = null;
+  }
+  if (mixer) { mixer.stopAllAction(); mixer = null; }
+  animations = [];
+  currentAction = null;
+
+  const loader = new THREE.GLTFLoader();
+  loader.load(url, (gltf) => {
+    model = gltf.scene;
+
+    // Auto-center & scale
+    const box = new THREE.Box3().setFromObject(model);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const scale = 2 / maxDim;
+    model.scale.setScalar(scale);
+    model.position.sub(center.multiplyScalar(scale));
+    model.position.y += size.y * scale / 2;
+
+    // Shadows
+    model.traverse(child => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
+
+    scene.add(model);
+    controls.target.set(0, size.y * scale * 0.5, 0);
+    controls.update();
+
+    // Animations
+    animations = gltf.animations;
+    mixer = animations.length ? new THREE.AnimationMixer(model) : null;
+    if (mixer && animations.length > 0) {
+      playAnim(0);
+    }
+
+    // Info
+    let verts = 0, meshes = 0;
+    model.traverse(c => { if (c.isMesh) { meshes++; verts += c.geometry.attributes.position?.count || 0; } });
+    document.getElementById('info-verts').textContent = verts.toLocaleString();
+    document.getElementById('info-meshes').textContent = meshes;
+    document.getElementById('info-anims').textContent = animations.length;
+    document.getElementById('info-bar').classList.add('visible');
+
+    buildAnimPanel();
+
+    document.getElementById('loading').classList.remove('visible');
+    document.getElementById('controls').classList.remove('hidden');
+    document.getElementById('speed-panel').classList.remove('hidden');
+    if (animations.length) document.getElementById('anim-panel').classList.add('visible');
+
+    URL.revokeObjectURL(url);
+  },
+  undefined,
+  (err) => {
+    console.error(err);
+    document.getElementById('loading').classList.remove('visible');
+    document.getElementById('drop-zone').classList.remove('hidden');
+    alert('Erro ao carregar o arquivo. Certifique-se de que é um GLB ou GLTF válido.');
+  });
+}
+
+function buildAnimPanel() {
+  const list = document.getElementById('anim-list');
+  list.innerHTML = '';
+  if (!animations.length) {
+    list.innerHTML = '<span style="color:var(--muted);font-size:0.65rem">Nenhuma animação</span>';
+    return;
+  }
+  animations.forEach((anim, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'anim-btn' + (i === 0 ? ' playing' : '');
+    btn.textContent = anim.name || `Anim ${i + 1}`;
+    btn.onclick = () => { playAnim(i); updateAnimBtns(i); };
+    list.appendChild(btn);
+  });
+}
+
+function updateAnimBtns(active) {
+  document.querySelectorAll('.anim-btn').forEach((b, i) => {
+    b.classList.toggle('playing', i === active);
+  });
+}
+
+function playAnim(index) {
+  if (!mixer || !animations[index]) return;
+  if (currentAction) currentAction.fadeOut(0.3);
+  currentAction = mixer.clipAction(animations[index]);
+  currentAction.reset().fadeIn(0.3).play();
+  updateAnimBtns(index);
+}
+
+// ── File handling ──────────────────────────────────────────────────
+function handleFile(file) {
+  if (!file) return;
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (!['glb', 'gltf'].includes(ext)) {
+    alert('Formato não suportado. Use .glb ou .gltf');
+    return;
+  }
+  const url = URL.createObjectURL(file);
+  loadGLB(url, file.name);
+}
+
+// File input
+document.getElementById('file-input').addEventListener('change', e => {
+  handleFile(e.target.files[0]);
+});
+
+// Drag & drop
+document.addEventListener('dragover', e => { e.preventDefault(); document.body.classList.add('drag-over'); });
+document.addEventListener('dragleave', e => { if (!e.relatedTarget) document.body.classList.remove('drag-over'); });
+document.addEventListener('drop', e => {
+  e.preventDefault();
+  document.body.classList.remove('drag-over');
+  handleFile(e.dataTransfer.files[0]);
+});
+
+// ── Buttons ────────────────────────────────────────────────────────
+document.getElementById('btn-reset').onclick = () => {
+  camera.position.set(0, 1.4, 3.5);
+  controls.target.set(0, 0.9, 0);
+  controls.update();
+};
+
+document.getElementById('btn-wireframe').onclick = function() {
+  wireframeOn = !wireframeOn;
+  if (model) {
+    model.traverse(c => {
+      if (c.isMesh) c.material.wireframe = wireframeOn;
+    });
+  }
+  this.classList.toggle('active', wireframeOn);
+};
+
+document.getElementById('btn-autorot').onclick = function() {
+  autoRotate = !autoRotate;
+  this.classList.toggle('active', autoRotate);
+};
+
+document.getElementById('btn-bg').onclick = function() {
+  bgDark = !bgDark;
+  const col = bgDark ? 0x0a0e1a : 0xdde8f0;
+  scene.background = new THREE.Color(col);
+  scene.fog.color = new THREE.Color(col);
+};
+
+document.getElementById('btn-new').onclick = () => {
+  document.getElementById('controls').classList.add('hidden');
+  document.getElementById('speed-panel').classList.add('hidden');
+  setSpeed(1);
+  slowMoOn = false;
+  document.getElementById('btn-slowmo').classList.remove('active');
+  document.getElementById('anim-panel').classList.remove('visible');
+  document.getElementById('info-bar').classList.remove('visible');
+  if (model) { scene.remove(model); model = null; }
+  if (mixer) { mixer.stopAllAction(); mixer = null; }
+  document.getElementById('drop-zone').classList.remove('hidden');
+};
+
+
+// ── Speed / slow-down ─────────────────────────────────────────────
+function setSpeed(v) {
+  playbackSpeed = Math.min(2, Math.max(0.1, v));
+  const slider = document.getElementById('speed-slider');
+  const label = document.getElementById('speed-value');
+  const info = document.getElementById('info-speed');
+  if (slider) slider.value = playbackSpeed;
+  const txt = playbackSpeed.toFixed(2) + '×';
+  if (label) label.textContent = txt;
+  if (info) info.textContent = txt;
+  document.querySelectorAll('.speed-preset').forEach(b => {
+    b.classList.toggle('active', Math.abs(parseFloat(b.dataset.speed) - playbackSpeed) < 0.001);
+  });
+}
+
+function toggleSlowMo() {
+  slowMoOn = !slowMoOn;
+  const btn = document.getElementById('btn-slowmo');
+  if (slowMoOn) {
+    if (playbackSpeed !== SLOWMO_SPEED) prevSpeed = playbackSpeed;
+    setSpeed(SLOWMO_SPEED);
+  } else {
+    setSpeed(prevSpeed || 1);
+  }
+  if (btn) btn.classList.toggle('active', slowMoOn);
+}
+
+document.getElementById('speed-slider').addEventListener('input', function() {
+  slowMoOn = false;
+  document.getElementById('btn-slowmo').classList.remove('active');
+  setSpeed(parseFloat(this.value));
+});
+
+document.querySelectorAll('.speed-preset').forEach(b => {
+  b.onclick = () => {
+    slowMoOn = false;
+    document.getElementById('btn-slowmo').classList.remove('active');
+    setSpeed(parseFloat(b.dataset.speed));
+  };
+});
+
+document.getElementById('btn-slowmo').onclick = toggleSlowMo;
+
+// Tecla S alterna o modo desacelerado
+document.addEventListener('keydown', e => {
+  if (e.key.toLowerCase() === 's' && !e.target.matches('input, textarea')) {
+    if (!document.getElementById('speed-panel').classList.contains('hidden')) toggleSlowMo();
+  }
+});
+
+// ── Boot ───────────────────────────────────────────────────────────
+initThree();
+</script>
+</body>
+</html>
